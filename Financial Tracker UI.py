@@ -2,6 +2,25 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 from datetime import datetime
+from transformers import GPT2LMHeadModel, GPT2Tokenizer
+import torch
+
+# --- Load GPT-2 Model ---
+tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
+model = GPT2LMHeadModel.from_pretrained("gpt2")
+model.eval()
+
+def get_gpt_response(user_input):
+    # Encode the input text using the GPT-2 tokenizer
+    input_ids = tokenizer.encode(user_input, return_tensors="pt")
+
+    # Generate a response using the GPT-2 model
+    with torch.no_grad():
+        outputs = model.generate(input_ids, max_length=100, num_return_sequences=1, pad_token_id=tokenizer.eos_token_id)
+
+    # Decode the generated response and return it
+    response = tokenizer.decode(outputs[0], skip_special_tokens=True)
+    return response
 
 # --- Page Config ---
 st.set_page_config(page_title="💰 BudgetBuddy", layout="wide")
