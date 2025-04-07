@@ -2,7 +2,6 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 from datetime import datetime
-import streamlit_cursor as cursor  # Add cursor for enhanced frontend components
 
 # --- Page Config ---
 st.set_page_config(page_title="💰 BudgetBuddy", layout="wide")
@@ -50,8 +49,8 @@ col1, col2 = st.columns([2, 1])
 with col1:
     st.subheader("💬 Chat with Your Financial Assistant")
     st.markdown("Ask anything — budget tips, investment advice, or money-saving hacks!")
-    user_input = cursor.text_area("Ask a question", key="chat_input")
-    if cursor.button("Send", key="send_button"):
+    user_input = st.text_area("Ask a question", key="chat_input")
+    if st.button("Send", key="send_button"):
         st.info("🔧 GPT reply placeholder. Integrate OpenAI here.")
         st.success("💡 Tip: You can meal prep to save more on food.")
 
@@ -59,9 +58,9 @@ with col1:
 with col2:
     st.subheader("🧾 Add an Expense")
     with st.form("expense_form"):
-        category = cursor.selectbox("Category", ["Food", "Transport", "Rent", "Utilities", "Entertainment", "Other"], key="category_select")
-        amount = cursor.number_input(f"Amount ({currency})", min_value=0.0, key="amount_input")
-        note = cursor.text_input("Note (optional)", key="note_input")
+        category = st.selectbox("Category", ["Food", "Transport", "Rent", "Utilities", "Entertainment", "Other"], key="category_select")
+        amount = st.number_input(f"Amount ({currency})", min_value=0.0, key="amount_input")
+        note = st.text_input("Note (optional)", key="note_input")
         submitted = st.form_submit_button("Add Expense")
         if submitted:
             add_expense(category, amount, note)
