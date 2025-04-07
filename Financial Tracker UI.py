@@ -1,15 +1,38 @@
+# 💖 Pink-Themed BudgetBuddy with Enhanced Features
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-from datetime import datetime
+from datetime import datetime, timedelta
 from transformers import GPT2LMHeadModel, GPT2Tokenizer
 import torch
 import time
 
 # --- Setup ---
-st.set_page_config(page_title="💰 BudgetBuddy", layout="wide")
+st.set_page_config(page_title="🎀 BudgetBuddy", layout="wide")
 
-# --- GPT-2 Model (Load Once) ---
+# --- Inject Pink Theme ---
+st.markdown("""
+    <style>
+        body {
+            background-color: #fff0f5;
+            color: #4b0082;
+        }
+        .css-1v0mbdj, .stApp, .block-container {
+            background-color: #fff0f5;
+        }
+        .stButton>button {
+            background-color: #ff69b4;
+            color: white;
+            border-radius: 10px;
+        }
+        .stTextInput>div>div>input, .stSelectbox>div>div {
+            background-color: #ffe4e1;
+            color: #4b0082;
+        }
+    </style>
+""", unsafe_allow_html=True)
+
+# --- Load GPT-2 Model ---
 @st.cache_resource
 def load_gpt2():
     tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
@@ -28,18 +51,19 @@ def get_gpt_response(user_input):
 # --- Helper Functions ---
 def load_expenses():
     try:
-        return pd.read_csv("expenses.csv", names=["date", "category", "amount", "note"])
+        return pd.read_csv("expenses.csv", names=["date", "category", "amount", "note", "recurring"])
     except:
-        return pd.DataFrame(columns=["date", "category", "amount", "note"])
+        return pd.DataFrame(columns=["date", "category", "amount", "note", "recurring"])
 
-def add_expense(category, amount, note):
+def add_expense(category, amount, note, recurring):
     with st.spinner("Adding expense..."):
         time.sleep(1)
         df = pd.DataFrame([{
             "date": datetime.now().strftime("%Y-%m-%d"),
             "category": category,
             "amount": amount,
-            "note": note
+            "note": note,
+            "recurring": recurring
         }])
         df.to_csv("expenses.csv", mode='a', header=False, index=False)
         st.success("🎉 Expense added!")
@@ -51,22 +75,32 @@ def predict_next_month():
     df["month"] = pd.to_datetime(df["date"]).dt.to_period("M")
     return df.groupby("month")["amount"].sum().mean()
 
-# --- Fake Auth (Frontend Only) ---
+def filter_by_period(df, period):
+    df["date"] = pd.to_datetime(df["date"])
+    today = datetime.today()
+    if period == "Weekly":
+        start_date = today - timedelta(days=7)
+    elif period == "Monthly":
+        start_date = today - timedelta(days=30)
+    else:
+        start_date = today - timedelta(days=365)
+    return df[df["date"] >= start_date]
+
+# --- Fake Auth ---
 if "is_logged_in" not in st.session_state:
     st.session_state.is_logged_in = False
 
 def login_page():
-    st.title("🔐 Login to BudgetBuddy")
+    st.title("🎀 Track your every last cent... with BudgetBuddy!")
+    st.markdown("<p style='font-size:18px;'>Login here 🐥</p>", unsafe_allow_html=True)
     email = st.text_input("Email")
     password = st.text_input("Password", type="password")
-    if st.button("Login"):
-        if email and password:
-            st.session_state.is_logged_in = True
-            st.success("Logged in successfully!")
-        else:
-            st.error("Please enter both email and password.")
-
-    st.info("Don't have an account? Go to 'Register' from the sidebar.")
+    login = st.button("Login")
+    if login and email and password:
+        st.session_state.is_logged_in = True
+        st.experimental_rerun()
+    elif login:
+        st.error("Please enter both email and password.")
 
 def register_page():
     st.title("📝 Register for BudgetBuddy")
@@ -74,7 +108,6 @@ def register_page():
     email = st.text_input("Email")
     phone_number = st.text_input("Phone Number")
     profile_pic = st.file_uploader("Upload Profile Picture", type=["jpg", "png", "jpeg"])
-
     if st.button("Register"):
         if username and email and phone_number:
             st.success("Registration successful! You can now log in.")
@@ -82,7 +115,6 @@ def register_page():
         else:
             st.error("Please fill in all required fields.")
 
-# --- Main App Pages ---
 def chat_page():
     st.subheader("💬 Chat with Your Financial Assistant")
     user_input = st.text_area("Ask anything about money, budgeting, etc.")
@@ -97,46 +129,62 @@ def add_expense_page():
         category = st.selectbox("Category", ["Food", "Transport", "Rent", "Utilities", "Entertainment", "Other"])
         amount = st.number_input("Amount", min_value=0.0)
         note = st.text_input("Note (optional)")
+        recurring = st.checkbox("Recurring?")
         submitted = st.form_submit_button("Add Expense")
         if submitted:
-            add_expense(category, amount, note)
+            add_expense(category, amount, note, recurring)
 
 def dashboard_page():
-    st.subheader("📊 Expense Dashboard")
+    st.subheader("💸 Expense Dashboard")
     df = load_expenses()
 
     if not df.empty:
         df["date"] = pd.to_datetime(df["date"])
         df["month"] = df["date"].dt.to_period("M")
 
-        total_spent = df["amount"].sum()
-        avg_spent = df.groupby("month")["amount"].sum().mean()
-        top_category = df.groupby("category")["amount"].sum().idxmax()
+        period = st.selectbox("View by time period:", ["Weekly", "Monthly", "Yearly"])
+        filtered_df = filter_by_period(df, period)
+
+        total_spent = filtered_df["amount"].sum()
+        avg_spent = filtered_df.groupby("month")["amount"].sum().mean()
+        top_category = filtered_df.groupby("category")["amount"].sum().idxmax()
 
         k1, k2, k3 = st.columns(3)
         k1.metric("💵 Total Spent", f"${total_spent:.2f}")
-        k2.metric("📈 Monthly Avg", f"${avg_spent:.2f}")
+        k2.metric("📈 Avg per Month", f"${avg_spent:.2f}")
         k3.metric("🏆 Top Category", top_category)
 
-        fig1 = px.pie(df, names='category', values='amount', title='Spending by Category')
-        st.plotly_chart(fig1, use_container_width=True)
+        st.markdown("### 📊 Category Breakdown")
+        st.plotly_chart(px.pie(filtered_df, names='category', values='amount'))
 
-        fig2 = px.line(df.groupby("month")["amount"].sum().reset_index(),
-                       x="month", y="amount", title="Monthly Spending Trend")
-        st.plotly_chart(fig2, use_container_width=True)
+        st.markdown("### 📈 Spending Trend")
+        st.plotly_chart(px.line(filtered_df.groupby(filtered_df["date"].dt.to_period("M"))["amount"].sum().reset_index(),
+                                x="date", y="amount", title="Spending Over Time"))
+
+        st.markdown("### 🔁 Recurring Expenses")
+        st.dataframe(df[df["recurring"] == True])
 
         with st.expander("📋 View All Expenses"):
-            st.dataframe(df.sort_values(by="date", ascending=False))
+            st.dataframe(filtered_df.sort_values(by="date", ascending=False))
     else:
         st.info("No expenses found. Start by adding one!")
 
-    st.subheader("🔮 Budget Prediction")
+    st.subheader("💳 Budget Prediction")
     pred = predict_next_month()
     st.success(f"Estimated next month’s budget: ${pred:.2f}")
 
+    st.markdown("### 🎯 Financial Goals")
+    goal = st.text_input("Set a financial goal (e.g. Save $1000)")
+    progress = st.slider("Progress toward goal", 0, 100, 25)
+    if goal:
+        st.success(f"You're {progress}% there to your goal: '{goal}'! Keep it up 💖")
+        if progress == 100:
+            st.balloons()
+            st.success("🏅 You've reached your goal! Reward unlocked!")
+
 # --- Sidebar Navigation ---
 st.sidebar.image("https://img.icons8.com/external-flaticons-lineal-color-flat-icons/64/000000/external-budget-planning-flaticons-lineal-color-flat-icons.png", width=100)
-st.sidebar.title("👋 BudgetBuddy")
+st.sidebar.title("🎀 Budget Buddy 🎀")
 
 if not st.session_state.is_logged_in:
     auth_choice = st.sidebar.radio("Choose an option", ["Login", "Register"])
@@ -145,7 +193,7 @@ if not st.session_state.is_logged_in:
     else:
         register_page()
 else:
-    st.sidebar.success("✅ Logged in")
+    st.sidebar.success("✅ You're logged in!")
     page = st.sidebar.radio("Navigate", ["Dashboard", "Add Expense", "Chat Assistant"])
     if page == "Dashboard":
         dashboard_page()
@@ -156,3 +204,17 @@ else:
     if st.sidebar.button("Logout"):
         st.session_state.is_logged_in = False
         st.experimental_rerun()
+
+# --- Optional: Generate Fake Data for Testing ---
+if st.sidebar.checkbox("Generate Fake Data"):
+    import random
+    cats = ["Food", "Transport", "Rent", "Utilities", "Entertainment", "Other"]
+    df = pd.DataFrame([{
+        "date": (datetime.today() - timedelta(days=random.randint(0, 365))).strftime("%Y-%m-%d"),
+        "category": random.choice(cats),
+        "amount": round(random.uniform(10, 300), 2),
+        "note": "Sample note",
+        "recurring": random.choice([True, False])
+    } for _ in range(100)])
+    df.to_csv("expenses.csv", index=False, header=False)
+    st.success("✅ Fake data generated!")
