@@ -51,7 +51,8 @@ with col1:
     st.markdown("Ask anything — budget tips, investment advice, or money-saving hacks!")
     user_input = st.text_area("Ask a question", key="chat_input")
     if st.button("Send", key="send_button"):
-        st.info("🔧 GPT reply placeholder. Integrate OpenAI here.")
+        response = get_gpt_response(user_input)
+        st.write(response)
         st.success("💡 Tip: You can meal prep to save more on food.")
 
 # --- Add Expense ---
