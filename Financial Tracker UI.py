@@ -10,27 +10,41 @@ import time
 # --- Setup ---
 st.set_page_config(page_title="🎀 BudgetBuddy", layout="wide")
 
-# --- Inject Pink Theme ---
+# --- Pink Theme Styling ---
 st.markdown("""
     <style>
-        body {
-            background-color: #fff0f5;
-            color: #4b0082;
-        }
-        .css-1v0mbdj, .stApp, .block-container {
-            background-color: #fff0f5;
-        }
-        .stButton>button {
-            background-color: #ff69b4;
-            color: white;
-            border-radius: 10px;
-        }
-        .stTextInput>div>div>input, .stSelectbox>div>div {
-            background-color: #ffe4e1;
-            color: #4b0082;
-        }
+    body {
+        background-color: #ffe4ec;
+        color: #c2185b;
+    }
+    .stApp {
+        background-color: #ffe4ec;
+    }
+    h1, h2, h3, h4, h5, h6, .stMarkdown {
+        color: #c2185b !important;
+    }
+    .css-1v0mbdj, .css-10trblm, .css-15zrgzn, .st-bb, .st-cb {
+        color: #c2185b !important;
+    }
+    .stButton>button {
+        background-color: #f8bbd0;
+        color: #880e4f;
+        border-radius: 8px;
+    }
+    .stButton>button:hover {
+        background-color: #f48fb1;
+        color: white;
+    }
+    .stSelectbox>div>div>div {
+        background-color: #fff0f5;
+        color: #c2185b !important;
+    }
+    .stDataFrame, .stTable, .stMarkdown {
+        color: #c2185b !important;
+    }
     </style>
 """, unsafe_allow_html=True)
+
 
 # --- Load GPT-2 Model ---
 @st.cache_resource
