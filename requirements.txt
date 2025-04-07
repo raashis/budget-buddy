@@ -1,0 +1,5 @@
+streamlit
+pandas
+plotly
+datetime
+streamlit_cursor  # Ensure this is available or replace with a similar library
