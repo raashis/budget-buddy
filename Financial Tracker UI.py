@@ -4,6 +4,7 @@ import plotly.express as px
 from datetime import datetime
 from transformers import GPT2LMHeadModel, GPT2Tokenizer
 import torch
+import time
 
 # --- Load GPT-2 Model ---
 tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
@@ -25,6 +26,45 @@ def get_gpt_response(user_input):
 # --- Page Config ---
 st.set_page_config(page_title="💰 BudgetBuddy", layout="wide")
 
+# --- Sidebar ---
+st.sidebar.image("https://img.icons8.com/external-flaticons-lineal-color-flat-icons/64/000000/external-budget-planning-flaticons-lineal-color-flat-icons.png", width=100)
+st.sidebar.title("👋 Welcome to BudgetBuddy")
+st.sidebar.markdown("Manage your expenses with AI help.")
+st.sidebar.markdown("---")
+
+# Dark Mode toggle
+dark_mode = st.sidebar.checkbox("Dark Mode", value=False)
+if dark_mode:
+    st.markdown("""
+        <style>
+        body {
+            background-color: #333333;
+            color: white;
+        }
+        .css-1g6z4gm {
+            background-color: #333333;
+        }
+        .css-1lcbn3d {
+            background-color: #333333;
+        }
+        .css-1aeh0bm {
+            color: white;
+        }
+        </style>
+    """, unsafe_allow_html=True)
+else:
+    st.markdown("""
+        <style>
+        body {
+            background-color: #fff0f5;
+            color: black;
+        }
+        .css-1g6z4gm {
+            background-color: #fff0f5;
+        }
+        </style>
+    """, unsafe_allow_html=True)
+
 # --- Helper Functions ---
 def load_expenses():
     try:
@@ -33,13 +73,17 @@ def load_expenses():
         return pd.DataFrame(columns=["date", "category", "amount", "note"])
 
 def add_expense(category, amount, note):
-    df = pd.DataFrame([{
-        "date": datetime.now().strftime("%Y-%m-%d"),
-        "category": category,
-        "amount": amount,
-        "note": note
-    }])
-    df.to_csv("expenses.csv", mode='a', header=False, index=False)
+    # Simulating loading for progress bar
+    with st.spinner("Adding expense..."):
+        time.sleep(1)  # Simulate a delay in expense addition
+        df = pd.DataFrame([{
+            "date": datetime.now().strftime("%Y-%m-%d"),
+            "category": category,
+            "amount": amount,
+            "note": note
+        }])
+        df.to_csv("expenses.csv", mode='a', header=False, index=False)
+        st.success("🎉 Expense added!")
 
 def predict_next_month():
     df = load_expenses()
@@ -48,14 +92,23 @@ def predict_next_month():
     df["month"] = pd.to_datetime(df["date"]).dt.to_period("M")
     return df.groupby("month")["amount"].sum().mean()
 
-# --- Sidebar ---
-st.sidebar.image("https://img.icons8.com/external-flaticons-lineal-color-flat-icons/64/000000/external-budget-planning-flaticons-lineal-color-flat-icons.png", width=100)
-st.sidebar.title("👋 Welcome to BudgetBuddy")
-st.sidebar.markdown("Manage your expenses with AI help.")
-st.sidebar.markdown("---")
-st.sidebar.subheader("🔧 Settings")
-currency = st.sidebar.selectbox("Currency", ["USD", "SGD", "EUR", "INR"])
-st.sidebar.markdown("---")
+# --- Registration ---
+def user_registration():
+    st.subheader("📝 Register for BudgetBuddy")
+    username = st.text_input("Username")
+    email = st.text_input("Email")
+    phone_number = st.text_input("Phone Number")
+    profile_pic = st.file_uploader("Upload your Profile Picture", type=["jpg", "png", "jpeg"])
+    if st.button("Register"):
+        if username and email and phone_number:
+            st.session_state.username = username
+            st.session_state.email = email
+            st.session_state.phone_number = phone_number
+            if profile_pic:
+                st.image(profile_pic, caption="Profile Picture", width=150)
+            st.success(f"Welcome {username}! Your profile has been created.")
+        else:
+            st.error("Please fill in all fields!")
 
 # --- Header ---
 st.title("💰 BudgetBuddy: Your AI Financial Assistant")
@@ -79,12 +132,11 @@ with col2:
     st.subheader("🧾 Add an Expense")
     with st.form("expense_form"):
         category = st.selectbox("Category", ["Food", "Transport", "Rent", "Utilities", "Entertainment", "Other"], key="category_select")
-        amount = st.number_input(f"Amount ({currency})", min_value=0.0, key="amount_input")
+        amount = st.number_input(f"Amount", min_value=0.0, key="amount_input")
         note = st.text_input("Note (optional)", key="note_input")
         submitted = st.form_submit_button("Add Expense")
         if submitted:
             add_expense(category, amount, note)
-            st.success("🎉 Expense added!")
 
 # --- Dashboard ---
 st.subheader("📊 Expense Dashboard")
@@ -100,8 +152,8 @@ if not df.empty:
     top_category = df.groupby("category")["amount"].sum().idxmax()
 
     k1, k2, k3 = st.columns(3)
-    k1.metric("💵 Total Spent", f"{currency} {total_spent:.2f}")
-    k2.metric("📈 Monthly Avg", f"{currency} {avg_spent:.2f}")
+    k1.metric("💵 Total Spent", f"${total_spent:.2f}")
+    k2.metric("📈 Monthly Avg", f"${avg_spent:.2f}")
     k3.metric("🏆 Top Category", top_category)
 
     # Charts
@@ -121,4 +173,10 @@ else:
 # --- Budget Prediction ---
 st.subheader("🔮 Next Month's Budget Prediction")
 pred = predict_next_month()
-st.success(f"Estimated budget for next month: {currency} {pred:.2f}")
+st.success(f"Estimated budget for next month: ${pred:.2f}")
+
+# --- User Registration Page ---
+if "username" not in st.session_state:
+    user_registration()
+else:
+    st.write(f"Welcome back, {st.session_state.username}! 🎉")
