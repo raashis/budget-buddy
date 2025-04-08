@@ -1,5 +1,7 @@
-streamlit
-pandas
-plotly
-transformers
-torch
+streamlit>=1.30.0
+pandas>=1.5.0
+plotly>=5.18.0
+torch>=2.0.0
+transformers>=4.35.0
+streamlit-calendar==0.2.0
+streamlit-toggle-switch==1.0.2
