@@ -1,4 +1,4 @@
-# 💖 Pink-Themed BudgetBuddy with All Enhanced Features
+# 💖 Pink-Themed BudgetBuddy with Enhanced Features
 import streamlit as st
 import pandas as pd
 import plotly.express as px
@@ -6,45 +6,160 @@ from datetime import datetime, timedelta
 from transformers import GPT2LMHeadModel, GPT2Tokenizer
 import torch
 import time
+import os
 import random
+import base64
 
 # --- Setup ---
 st.set_page_config(page_title="🎀 BudgetBuddy", layout="wide")
 
-# --- Dark Mode Toggle ---
+# --- Pink Theme Styling + Dark Mode Support ---
 if "dark_mode" not in st.session_state:
     st.session_state.dark_mode = False
 
-mode = st.sidebar.toggle("🌚 Dark Mode", value=st.session_state.dark_mode)
-st.session_state.dark_mode = mode
-
-primary_color = "#ffe4ec" if not mode else "#2c003e"
-text_color = "#c2185b" if not mode else "#ffd6ef"
-button_color = "#f8bbd0" if not mode else "#b40060"
-
-# --- Styling ---
-st.markdown(f"""
+light_theme = """
     <style>
-    .stApp {{
-        background-color: {primary_color};
-        color: {text_color};
-    }}
-    h1, h2, h3, h4, h5, h6, .stMarkdown {{
-        color: {text_color} !important;
-    }}
-    .stButton>button {{
-        background-color: {button_color};
-        color: white;
+    body {
+        background-color: #ffe4ec;
+        color: #000000;
+    }
+    .stApp {
+        background-color: #ffe4ec;
+    }
+    h1, h2, h3, h4, h5, h6, .stMarkdown, .css-1v0mbdj, .css-10trblm, .css-15zrgzn, .st-bb, .st-cb,
+    label, .stTextInput label, .stFileUploader label, .stSelectbox label, .stCheckbox label {
+        color: #000000 !important;
+    }
+    .stButton>button {
+        background-color: #f8bbd0;
+        color: #880e4f;
         border-radius: 8px;
-    }}
-    .stButton>button:hover {{
+    }
+    .stButton>button:hover {
         background-color: #f48fb1;
         color: white;
-    }}
-    </style>
-""", unsafe_allow_html=True)
+    }
+    .stSelectbox>div>div>div {
+        background-color: #fff0f5;
+        color: #000000 !important;
+    }
 
-# --- GPT-2 Model for Chatbot ---
+    </style>
+"""
+
+dark_theme = """
+    <style>
+    body {
+        background-color: #1c1f26;
+        color: #f8bbd0;
+    }
+    .stApp {
+        background-color: #1c1f26;
+    }
+    h1, h2, h3, h4, h5, h6, .stMarkdown, .css-1v0mbdj, .css-10trblm, .css-15zrgzn, .st-bb, .st-cb,
+    label, .stTextInput label, .stFileUploader label, .stSelectbox label, .stCheckbox label {
+        color: #f8bbd0 !important;
+    }
+    .stButton>button {
+        background-color: #3b4a70;
+        color: #f8bbd0;
+        border-radius: 8px;
+    }
+    .stButton>button:hover {
+        background-color: #5a6c98;
+        color: white;
+    }
+    .stSelectbox>div>div>div {
+        background-color: #3b4a70;
+        color: #f8bbd0 !important;
+    }
+
+    .st-emotion-cache-1d3w5wq {
+            color: #ff66b2 !important;  /* Pink text color for sidebar title in dark mode */
+    }
+
+    .css-1lcb9o6 {
+            color: #ff66b2 !important;  /* Pink text color for "Navigate" in dark mode */
+    }
+
+    </style>
+"""
+
+sidebar_style = """
+<style>
+[data-testid="stSidebar"] {
+    background-color: #1f1f29 !important; /* Always-dark sidebar */
+}
+
+/* Sidebar title */
+[data-testid="stSidebar"] h1 {
+    color: #f8bbd0 !important;
+    font-weight: bold;
+}
+
+/* Sidebar checkbox styling */
+[data-testid="stSidebar"] .stCheckbox > div {
+    align-items: center;
+    gap: 8px;
+}
+[data-testid="stSidebar"] .stCheckbox > div > label {
+    color: #f8bbd0 !important;
+    font-size: 16px;
+    font-weight: 500;
+}
+
+/* Sidebar radio button labels */
+[data-testid="stSidebar"] .stRadio > div > label {
+    color: #f8bbd0 !important;
+    font-size: 16px;
+    font-weight: 500;
+}
+
+/* Make all sidebar labels white */
+[data-testid="stSidebar"] label {
+    color: white !important;
+    font-weight: 500;
+}
+
+
+</style>
+"""
+
+st.markdown(sidebar_style, unsafe_allow_html=True)
+
+# Apply the correct theme based on dark mode toggle
+if st.session_state.dark_mode:
+    st.markdown(dark_theme, unsafe_allow_html=True)
+else:
+    st.markdown(light_theme, unsafe_allow_html=True)
+
+# --- Initialize session state ---
+if "dark_mode" not in st.session_state:
+    st.session_state.dark_mode = False
+if "theme_toggled" not in st.session_state:
+    st.session_state.theme_toggled = False
+
+# --- Apply Theme ---
+if st.session_state.dark_mode:
+    st.markdown(dark_theme, unsafe_allow_html=True)
+else:
+    st.markdown(light_theme, unsafe_allow_html=True)
+
+# --- Toggle Button ---
+toggle = st.sidebar.checkbox("🌙 Toggle Dark Mode", value=st.session_state.dark_mode)
+
+# --- Handle Toggle Logic ---
+if toggle != st.session_state.dark_mode:
+    st.session_state.dark_mode = toggle
+    st.session_state.theme_toggled = True
+    st.rerun()
+
+# --- After rerun, reset the toggle flag ---
+if st.session_state.theme_toggled:
+    st.session_state.theme_toggled = False
+
+
+# --- Load GPT-2 Model ---
 @st.cache_resource
 def load_gpt2():
     tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
@@ -60,43 +175,30 @@ def get_gpt_response(user_input):
         outputs = model.generate(input_ids, max_length=100, num_return_sequences=1, pad_token_id=tokenizer.eos_token_id)
     return tokenizer.decode(outputs[0], skip_special_tokens=True)
 
-# --- Loaders ---
+# --- Helper Functions ---
 def load_expenses():
+    # Replace this path with the correct path to your CSV file
     try:
-        return pd.read_csv("expenses.csv", names=["date", "category", "amount", "note", "recurring"])
-    except:
-        return pd.DataFrame(columns=["date", "category", "amount", "note", "recurring"])
+        df = pd.read_csv("expenses.csv", on_bad_lines='skip')
+        df["date"] = pd.to_datetime(df["date"])
+        return df
+    except FileNotFoundError:
+        st.error("The expenses.csv file was not found.")
+        return pd.DataFrame()  # Return an empty DataFrame if file is not found
 
-def load_savings():
-    try:
-        return pd.read_csv("savings_jars.csv")
-    except:
-        return pd.DataFrame(columns=["goal_name", "target_amount", "current_amount", "description"])
-
-def load_reminders():
-    try:
-        return pd.read_csv("reminders.csv")
-    except:
-        return pd.DataFrame(columns=["name", "amount", "due_date", "remind_7", "remind_3"])
-
-def predict_next_month():
-    df = load_expenses()
-    if df.empty:
-        return 0.0
-    df["date"] = pd.to_datetime(df["date"])
-    df["month"] = df["date"].dt.to_period("M")
-    return df.groupby("month")["amount"].sum().mean()
-
-def filter_by_period(df, period):
-    df["date"] = pd.to_datetime(df["date"])
-    today = datetime.today()
-    if period == "Weekly":
-        start_date = today - timedelta(days=7)
-    elif period == "Monthly":
-        start_date = today - timedelta(days=30)
-    else:
-        start_date = today - timedelta(days=365)
-    return df[df["date"] >= start_date]
+def add_expense(category, amount, note, recurring):
+    with st.spinner("Adding expense..."):
+        time.sleep(1)
+        df = pd.DataFrame([{
+            "date": datetime.now().strftime("%Y-%m-%d"),
+            "category": category,
+            "amount": amount,
+            "note": note,
+            "recurring": recurring
+        }])
+        file_exists = os.path.isfile("expenses.csv")
+        df.to_csv("expenses.csv", mode='a', header=not file_exists, index=False)
+        st.success("🎉 Expense added!")
 
 # --- Fake Auth ---
 if "is_logged_in" not in st.session_state:
@@ -104,205 +206,274 @@ if "is_logged_in" not in st.session_state:
 
 def login_page():
     st.title("🎀 Track your every last cent... with BudgetBuddy!")
-    email = st.text_input("Email")
+    st.markdown("<p style='font-size:18px;'>Login here 🐥</p>", unsafe_allow_html=True)
+    username = st.text_input("Username")
     password = st.text_input("Password", type="password")
     login = st.button("Login")
-    if login and email and password:
+    
+    if login and username and password:
+        # Update session state for login status
         st.session_state.is_logged_in = True
-        st.rerun()
+        st.session_state.just_logged_in = True
+        st.session_state.just_registered = False  # Make sure it's reset if re-login
+        page = "Dashboard"  # Directly assign page to 'Dashboard'
     elif login:
-        st.error("Please enter both email and password.")
+        st.error("Please enter both username and password.")
 
 def register_page():
     st.title("📝 Register for BudgetBuddy")
     username = st.text_input("Username")
     email = st.text_input("Email")
-    phone = st.text_input("Phone Number")
-    pic = st.file_uploader("Upload Profile Picture")
+    phone_number = st.text_input("Phone Number")
+    profile_pic = st.file_uploader("Upload Profile Picture", type=["jpg", "png", "jpeg"])
     if st.button("Register"):
-        if username and email and phone:
+        if username and email and phone_number:
             st.success("Registration successful! You can now log in.")
             st.balloons()
+            st.session_state.is_logged_in = True
+            st.session_state.just_registered = True
+            st.session_state.just_logged_in = False  # Make sure it's reset after registration
+            page = "Add Expense"  # Redirect to Add Expense after registration
         else:
-            st.error("Please complete all fields.")
+            st.error("Please fill in all required fields.")
 
-# --- Pages ---
-def dashboard_page():
-    st.subheader("💸 Expense Dashboard")
-    df = load_expenses()
-    if df.empty:
-        st.info("No expenses yet. Add some to get started!")
-        return
-
-    df["date"] = pd.to_datetime(df["date"])
-    df["month"] = df["date"].dt.to_period("M")
-
-    period = st.selectbox("View by time period:", ["Weekly", "Monthly", "Yearly"])
-    filtered_df = filter_by_period(df, period)
-
-    if filtered_df.empty:
-        st.warning("No expenses in this time frame.")
-        return
-
-    total_spent = filtered_df["amount"].sum()
-    avg_spent = filtered_df.groupby("month")["amount"].sum().mean()
-    top_category = filtered_df.groupby("category")["amount"].sum().idxmax()
-
-    k1, k2, k3 = st.columns(3)
-    k1.metric("💵 Total Spent", f"${total_spent:.2f}")
-    k2.metric("📈 Avg per Month", f"${avg_spent:.2f}")
-    k3.metric("🏆 Top Category", top_category)
-
-    st.plotly_chart(px.pie(filtered_df, names='category', values='amount'))
-    trend_df = filtered_df.copy()
-    trend_df["month"] = trend_df["date"].dt.to_timestamp().dt.to_period("M").astype(str)
-    st.plotly_chart(px.line(trend_df.groupby("month")["amount"].sum().reset_index(), x="month", y="amount"))
-
-    st.subheader("🔁 Recurring Expenses")
-    st.dataframe(df[df["recurring"] == True])
-
-    st.subheader("💳 Budget Prediction")
-    pred = predict_next_month()
-    st.success(f"Estimated next month’s budget: ${pred:.2f}")
-
-    st.subheader("🌟 Financial Goals")
-    goal = st.text_input("Set a financial goal (e.g. Save $1000)")
-    progress = st.slider("Progress toward goal", 0, 100, 25)
-    if goal:
-        st.success(f"You're {progress}% there to your goal: '{goal}'! Keep it up 💖")
-        if progress == 100:
-            st.balloons()
-            st.success("🏅 You've reached your goal! Reward unlocked!")
-
-def add_expense_page():
-    st.subheader("🧳 Add an Expense")
-    with st.form("expense_form"):
-        category = st.selectbox("Category", ["Food", "Transport", "Rent", "Utilities", "Entertainment", "Other"])
-        amount = st.number_input("Amount", min_value=0.0)
-        note = st.text_input("Note (optional)")
-        recurring = st.checkbox("Recurring?")
-        submitted = st.form_submit_button("Add Expense")
-        if submitted:
-            df = pd.DataFrame([{ "date": datetime.now().strftime("%Y-%m-%d"),
-                                "category": category,
-                                "amount": amount,
-                                "note": note,
-                                "recurring": recurring }])
-            df.to_csv("expenses.csv", mode='a', header=False, index=False)
-            st.success("🎉 Expense added!")
-
-def chat_page():
-    st.subheader("💬 Chat with Your Financial Assistant")
-    user_input = st.text_area("Ask anything about money, budgeting, etc.")
-    if st.button("Send"):
-        response = get_gpt_response(user_input)
-        st.write(response)
-        st.success("💡 Tip: You can meal prep to save more on food.")
-
-def savings_jars_page():
-    st.subheader("🎰 Savings Jars")
-    df = load_savings()
-    with st.form("savings_form"):
-        goal_name = st.text_input("Goal Name")
-        target_amount = st.number_input("Target Amount", min_value=0.0)
-        current_amount = st.number_input("Current Saved", min_value=0.0)
-        description = st.text_input("What is this for?")
-        if st.form_submit_button("Add Jar"):
-            new = pd.DataFrame([{"goal_name": goal_name, "target_amount": target_amount,
-                                 "current_amount": current_amount, "description": description}])
-            new.to_csv("savings_jars.csv", mode='a', header=False, index=False)
-            st.success("Jar added!")
-    if not df.empty:
-        for _, row in df.iterrows():
-            st.progress(int((row.current_amount / row.target_amount) * 100))
-            st.write(f"{row.goal_name} ({row.description}): ${row.current_amount} / ${row.target_amount}")
-
-def reminders_page():
-    st.subheader("📅 Recurring Payment Reminders")
-    df = load_reminders()
-    with st.form("reminder_form"):
-        name = st.text_input("Payment Name")
-        amount = st.number_input("Amount", min_value=0.0)
-        due_date = st.date_input("Due Date")
-        remind_7 = st.checkbox("Remind me 7 days before")
-        remind_3 = st.checkbox("Remind me 3 days before")
-        if st.form_submit_button("Add Reminder"):
-            new = pd.DataFrame([{"name": name, "amount": amount, "due_date": due_date,
-                                 "remind_7": remind_7, "remind_3": remind_3}])
-            new.to_csv("reminders.csv", mode='a', header=False, index=False)
-            st.success("Reminder added!")
-    if not df.empty:
-        st.dataframe(df)
-        calendar_df = df.copy()
-        calendar_df["due_date"] = pd.to_datetime(calendar_df["due_date"])
-        st.plotly_chart(px.timeline(calendar_df, x_start="due_date", x_end="due_date", y="name", title="Upcoming Reminders"))
-
-def summary_page():
-    st.subheader("📧 Weekly Summary Email Preview")
-    df = load_expenses()
-    if df.empty:
-        st.info("No expenses found to generate summary.")
-        return
-    df["date"] = pd.to_datetime(df["date"])
-    this_week = df[df["date"] >= datetime.now() - timedelta(days=7)]
-    st.write(f"Total Spent: ${this_week['amount'].sum():.2f}")
-    if not this_week.empty:
-        top_categories = this_week.groupby("category")["amount"].sum().sort_values(ascending=False).head(3)
-        st.write("Top Categories:")
-        st.write(top_categories)
-
-# --- Navigation ---
-st.sidebar.image("https://img.icons8.com/external-flaticons-lineal-color-flat-icons/64/000000/external-budget-planning-flaticons-lineal-color-flat-icons.png", width=100)
 st.sidebar.title("🎀 Budget Buddy 🎀")
 
+# Show the login or register page if not logged in
 if not st.session_state.is_logged_in:
-    page = st.sidebar.radio("Choose an option", ["Login", "Register"])
-    if page == "Login":
-        login_page()
+    auth_choice = st.sidebar.radio("Choose an option", ["Login", "Register"])
+    if auth_choice == "Login":
+        login_page()  # Your login page logic here
     else:
-        register_page()
+        register_page()  # Your registration page logic here
 else:
+    # After logging in, immediately show the navigation sidebar options
+    page = st.sidebar.radio("Navigate", ["Dashboard", "Add Expense", "Savings Jars", "Reminders", "Chat Assistant", "Weekly Summary"])
+
+    # Show logged-in success message
     st.sidebar.success("✅ You're logged in!")
-    page = st.sidebar.radio("Navigate", ["Dashboard", "Add Expense", "Chat Assistant", "Savings Jars", "Reminders", "Weekly Summary"])
-    if page == "Dashboard":
-        dashboard_page()
-    elif page == "Add Expense":
-        add_expense_page()
-    elif page == "Chat Assistant":
-        chat_page()
-    elif page == "Savings Jars":
-        savings_jars_page()
-    elif page == "Reminders":
-        reminders_page()
-    elif page == "Weekly Summary":
-        summary_page()
+
+    # Handle logout
     if st.sidebar.button("Logout"):
         st.session_state.is_logged_in = False
-        st.rerun()
+        st.experimental_rerun()  # Rerun the app to show login/register page
 
-# --- Generate Fake Data ---
-if st.sidebar.checkbox("Generate Fake Data"):
-    # Expenses
-    cats = ["Food", "Transport", "Rent", "Utilities", "Entertainment", "Other"]
-    df = pd.DataFrame([{
-        "date": (datetime.today() - timedelta(days=random.randint(0, 365))).strftime("%Y-%m-%d"),
-        "category": random.choice(cats),
-        "amount": round(random.uniform(10, 300), 2),
-        "note": "Sample note",
-        "recurring": random.choice([True, False])
-    } for _ in range(100)])
-    df.to_csv("expenses.csv", index=False, header=False)
+    # Display selected page content
+    if page == "Dashboard":
+        st.header("📊 Dashboard")
+        # Dashboard content here
 
-    # Savings Jars
-    pd.DataFrame([
-        {"goal_name": "Paris Trip", "target_amount": 1500, "current_amount": 400, "description": "Summer vacation"},
-        {"goal_name": "Laptop Fund", "target_amount": 2000, "current_amount": 1200, "description": "For school work"},
-    ]).to_csv("savings_jars.csv", index=False)
+    elif page == "Add Expense":
+        st.header("➕ Add New Expense")
+        # Add Expense content here
 
-    # Reminders
-    pd.DataFrame([
-        {"name": "Rent", "amount": 800, "due_date": datetime.now().strftime("%Y-%m-%d"), "remind_7": True, "remind_3": True},
-        {"name": "Spotify", "amount": 10.99, "due_date": (datetime.now()+timedelta(days=10)).strftime("%Y-%m-%d"), "remind_7": False, "remind_3": True},
-    ]).to_csv("reminders.csv", index=False)
+    elif page == "Savings Jars":
+        st.header("🏦 Savings Jars")
+        # Savings Jars content here
 
-    st.success("✅ Fake data generated for all modules!")
+    elif page == "Reminders":
+        st.header("🔔 Payment Reminders")
+        # Reminders content here
+
+    elif page == "Chat Assistant":
+        st.header("🧠 Chat with BudgetBuddy")
+        # Chat Assistant content here
+
+    elif page == "Weekly Summary":
+        st.header("📬 Weekly Summary Email Preview")
+        # Weekly Summary content here
+
+
+    # --- Page Routing Logic ---
+    if page == "Dashboard":
+
+        df = load_expenses()
+        if not df.empty:
+            df["amount"] = pd.to_numeric(df["amount"], errors="coerce")
+            df["date"] = pd.to_datetime(df["date"])
+            spending_by_category = df.groupby("category")["amount"].sum().reset_index()
+
+            # Pie Chart with only plot background Merlot
+            fig = px.pie(spending_by_category, names="category", values="amount", title="Spending by Category")
+            fig.update_layout(
+                # plot_bgcolor="#500071",
+                paper_bgcolor="#C8D8B9",
+                font=dict(color="white"),
+                title_font=dict(size=20, color="white"),
+            )
+            st.plotly_chart(fig)
+
+
+            # # Line Chart with only plot background mint
+            # trend = df.groupby(df["date"].dt.to_period("M")).sum(numeric_only=True).reset_index()
+            # trend["date"] = trend["date"].astype(str)
+
+            # fig2 = px.line(trend, x="date", y="amount", title="Spending Trend Over Time")
+            # fig2.update_layout(
+            #     # plot_bgcolor="#500071",
+            #     paper_bgcolor='#C8D8B9',   # mint green
+            #     font=dict(color="black"),   # Changed to black for better visibility
+            #     xaxis_title="Date",         # Custom x-axis label
+            #     yaxis_title="Amount",       # Custom y-axis label
+            #     title_font=dict(size=20, color="black"),  # Adjusted title font color
+            #     xaxis=dict(showgrid=True, gridcolor="white"),  # Optional: Show gridlines
+            #     yaxis=dict(showgrid=True, gridcolor="white")   # Optional: Show gridlines
+            # )
+
+            # st.plotly_chart(fig2)
+        else:
+            st.info("No expenses yet. Add one under 'Add Expense'!")
+
+
+
+    elif page == "Add Expense":
+        category = st.selectbox("Category", ["Food", "Transport", "Shopping", "Rent", "Utilities", "Other"])
+        amount = st.number_input("Amount", min_value=0.0, format="%.2f")
+        note = st.text_input("Note")
+        recurring = st.checkbox("Recurring?")
+        if st.button("Add Expense"):
+            add_expense(category, amount, note, recurring)
+
+
+
+        # --- Savings Jars Page ---
+    elif page == "Savings Jars":
+        if "jars" not in st.session_state:
+            st.session_state.jars = []
+
+        # Jar setup
+        jar_name = st.text_input("Jar Name")
+        jar_goal = st.number_input("Financial Goal", min_value=0.0, format="%.2f")
+        jar_description = st.text_input("What is this jar for?")
+        jar_progress = st.slider("Progress", 0, 100, 0)
+
+        # Coin drop animation function
+        def coin_drop_animation():
+            coin = "🪙"
+            st.markdown("<p style='font-size:24px; text-align:center;'>Saving ongoing!</p>", unsafe_allow_html=True)
+            
+            # Create an empty container to hold the coin and update it with new positions
+            coin_placeholder = st.empty()
+            
+            # Animate the coin falling (to create a smooth effect)
+            for i in range(1, 11):  # Number of steps for the drop animation
+                coin_placeholder.markdown(f"<p style='font-size:48px; text-align:center; padding-top:{i * 5}px;'>{coin}</p>", unsafe_allow_html=True)
+                time.sleep(0.1)  # Short delay to animate the coin drop
+
+        # Add Jar Button
+        if st.button("Add Jar"):
+            # Check if all fields are filled
+            if jar_name and jar_goal > 0 and jar_description:
+                # Create the new jar dictionary
+                new_jar = {
+                    "name": jar_name,
+                    "goal": jar_goal,
+                    "description": jar_description,
+                    "progress": jar_progress
+                }
+
+                # Add the new jar to session state
+                st.session_state.jars.append(new_jar)
+
+                # Provide success feedback
+                st.success(f"Jar '{jar_name}' has been added successfully!")
+
+                # Trigger coin drop animation after adding the jar
+                coin_drop_animation()
+
+            else:
+                # Provide warning if fields are missing
+                st.warning("Please fill in all fields to add a jar.")
+
+        # Read and encode the image to base64
+        with open("image.png", "rb") as image_file:
+            jar_image_base64 = base64.b64encode(image_file.read()).decode("utf-8")
+
+        # Display the image centered using HTML
+        st.markdown(
+            f"""
+            <div style='text-align: center; margin-top: -5px;'>
+                <img src='data:image/png;base64,{jar_image_base64}' width='150'>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+        # Display progress next to the jar
+        for jar in st.session_state.jars:
+            st.markdown(f"<p style='font-size:16px; color:black; text-align:center;'>Progress: {jar['progress']}%</p>", unsafe_allow_html=True)
+
+
+    elif page == "Reminders":
+    # Define the reminders with due dates
+# List to store reminders
+        reminders = []
+
+        # Ask for the number of reminders
+        num_reminders = st.number_input("How many reminders would you like to add?", min_value=1, max_value=10, value=1)
+
+        # Loop to add the reminders
+        for i in range(num_reminders):
+            st.subheader(f"Reminder {i+1}")
+
+            # Get reminder details
+            name = st.text_input(f"Name of reminder {i+1}")
+            amount = st.number_input(f"Amount for {name}", min_value=0.0, format="%.2f")
+            due_date = st.date_input(f"Due date for {name}")
+
+            # Calculate remaining days
+            days_left = (due_date - datetime.now().date()).days
+
+            if st.button(f"Add Reminder {i+1}"):
+                reminders.append({
+                    "name": name,
+                    "amount": amount,
+                    "due": due_date,
+                    "days_left": days_left
+                })
+                st.success(f"Reminder '{name}' has been added successfully!")
+
+        # Display the reminders
+        if reminders:
+            st.subheader("Your Reminders")
+            for r in reminders:
+                st.markdown(f"<p style='color:#003366; font-size:16px;'>"
+                            f"{r['name']} - ${r['amount']} due in {r['days_left']} days</p>",
+                            unsafe_allow_html=True)
+    elif page == "Chat Assistant":
+        user_input = st.text_input("Ask me anything about budgeting!")
+        if user_input:
+            response = get_gpt_response(user_input)
+            st.success(response)
+
+    elif page == "Weekly Summary":
+    # Function to load reminders from CSV
+        def load_reminders():
+            reminders_file = "reminders.csv"
+            df = pd.read_csv(reminders_file)
+            
+            # Convert 'due_date' column to datetime if necessary
+            df["due_date"] = pd.to_datetime(df["due_date"])
+            
+            return df
+        
+        # Function to get reminders from the past week
+        def get_weekly_reminders():
+            df = load_reminders()
+            
+            # Get today's date
+            today = pd.to_datetime("today")
+
+            # Filter for reminders due in the past week
+            past_week_reminders = df[df["due_date"] >= today - pd.DateOffset(weeks=1)]
+
+            return past_week_reminders
+
+        # Get the past week's reminders
+        weekly_reminders = get_weekly_reminders()
+
+        # Display weekly reminders in the UI
+        if not weekly_reminders.empty:
+            st.dataframe(weekly_reminders)
+        else:
+            st.info("No reminders due in the past week.")
